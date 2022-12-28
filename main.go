@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -14,35 +15,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func HConfig() {
-	type Config struct {
-		Conn struct {
-			Protocol string `yaml: "protocol"`
-			Host string `yaml: "host"`
-			Port string `yaml: "port"`
-		}
-	}
-
-	f, err := os.Open("hate.yml")
-	if err != nil {
-		processError(err)
-	}
-
-	defer f.Close()
-
-	var conf Config
-	decoder := yaml.NewDecoder((f))
-	err = decoder.Decode(&conf)
-	if err != nil {
-		log.Error().Err(err).Msg("Error when opening configuration file.")
-		processError(err)
-	}
-
-}
-
-
 
 func main() {
+	hcfg, err := nConn(*cInfo, hateConfig{
+		Protocol: "tcp://",
+		Host: "0.0.0.0",
+		Port: "5555",
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("A fatal error has occurred.")
+	}
+	defer hcfg.close()
+	hConn = fmt.Sprintf("%s%s%s", &hcfg.Protocol, &hcfg.Host, &hcfg.Port)
 	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
 	log := zerolog.New(output).With().Timestamp().Logger()
 	list := &cobra.Command{
@@ -51,7 +35,7 @@ func main() {
 		Long:  "list docker containers, butt longer",
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Info().Msg("Test")
-			host := "tcp://0.0.0.0:5555"
+			host := hConn 
 
 			dc, err := dockerClient.NewClientWithOpts(
 				dockerClient.WithHost(host),
