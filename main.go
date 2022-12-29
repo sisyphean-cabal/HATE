@@ -54,8 +54,8 @@ func main() {
 
 	create := &cobra.Command{
 		Use:   "create",
-		Short: "create docker containers",
-		Long:  "create longer docker containers",
+		Short: "create and start docker containers",
+		Long:  "create and start longer docker containers",
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Info().Msg("Starting create")
 			host := hconn
@@ -77,6 +77,14 @@ func main() {
 				Cmd:   []string{"echo", "hello world"},
 				Tty:   false,
 			}, nil, nil, nil, "")
+
+			if err != nil {
+				log.Error().Err(err).Msg("why the fuck is our logging command so long?")
+			}
+			if err := dc.ContainerStart(context.Background(),
+				resp.ID, types.ContainerStartOptions{}); err != nil {
+				log.Error().Err(err).Msg("Seriously what the fuck?")
+			}
 		},
 	}
 
