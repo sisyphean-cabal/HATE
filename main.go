@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
@@ -50,5 +51,34 @@ func main() {
 
 		},
 	}
+
+	create := &cobra.Command{
+		Use:   "create",
+		Short: "create docker containers",
+		Long:  "create longer docker containers",
+		Run: func(cmd *cobra.Command, args []string) {
+			log.Info().Msg("Starting create")
+			host := hconn
+
+			dc, err := dockerClient.NewClientWithOpts(
+				dockerClient.WithHost(host),
+				dockerClient.WithAPIVersionNegotiation(),
+			)
+
+			if err != nil {
+				log.Error().Err(err).Msg("Error when starting docker container.")
+				return
+			}
+
+			defer dc.Close()
+
+			resp, err := dc.ContainerCreate(context.Background(), &container.Config{
+				Image: "alpine",
+				Cmd:   []string{"echo", "hello world"},
+				Tty:   false,
+			}, nil, nil, nil, "")
+		},
+	}
+
 	list.Execute()
 }
