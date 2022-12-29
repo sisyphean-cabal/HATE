@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
@@ -85,8 +86,22 @@ func main() {
 				resp.ID, types.ContainerStartOptions{}); err != nil {
 				log.Error().Err(err).Msg("Seriously what the fuck?")
 			}
+			stats, errstat := dc.ContainerWait(context.Background(), resp.ID, container.WaitConditionNotRunning)
+			select {
+			case err := <-errstat:
+				if err != nil {
+					log.Error().Err(err).Msg("Writing logs has never been more painful")
+				}
+			case <-stats:
+			}
+
+			out, err := dc.ContainerLogs(context.Background(), resp.ID, types.ContainerLogsOptions{ShowStdout: true})
+			if err != nil {
+				log.Error().Err(err).Msg("We need to fix this oh my god. We have to write these after almost ever statement. Jesus.")
+			}
+			stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 		},
 	}
-
+	create.Execute()
 	list.Execute()
 }
