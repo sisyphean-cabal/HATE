@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rs/zerolog"
@@ -101,6 +102,21 @@ func main() {
 			}
 			stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 		},
+	}
+
+	stop := &cobra.Command{
+		Use: "stop",
+		Short: "Stop all running containers",
+		Long: "Longer stop all running containers.",
+		Run: func(cmd *cobra.Command, args []string){
+			log.Info().Msg("Stopping all containers")
+			cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+			if err != nil {
+				log.Error().Err(err).Msg("There was an issue stopping the containers.")
+				// fail fast
+				panic(err)
+			}
+		}
 	}
 	create.Execute()
 	list.Execute()
