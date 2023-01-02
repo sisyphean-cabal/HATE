@@ -114,15 +114,15 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Info().Msg("Stopping all containers")
 			host := hconn
-			cli, err := client.NewClientWithOpts(client.WithHost(host), client.WithAPIVersionNegotiation())
+			dc, err := dockerClient.NewClientWithOpts(client.WithHost(host), client.WithAPIVersionNegotiation())
 			if err != nil {
 				log.Error().Err(err).Msg("There was an issue stopping the containers.")
 				// what's the difference between the line below and the line above.
 				panic(err)
 			}
-			defer cli.Close()
+			defer dc.Close()
 
-			containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+			containers, err := dc.ContainerList(ctx, types.ContainerListOptions{})
 			if err != nil {
 				log.Error().Err(err).Msg("There was an issue obtaining the container context.")
 				// handle
@@ -130,7 +130,7 @@ func main() {
 
 			for _, container := range containers {
 				fmt.Println("Stopping container ", container.ID[:10], "...")
-				if err := cli.ContainerStop(context.Background(), container.ID, nil); err != nil {
+				if err := dc.ContainerStop(context.Background(), container.ID, nil); err != nil {
 					log.Error().Err(err).Msg("We can't stop this container, it's up forever now. You've lost.")
 					// handle
 				}
