@@ -17,114 +17,112 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 type errorMessage struct {
-	err error
+	err    error
 	reason string
 }
 
+func dcList(hconn string, ctx context.Context, outChan chan string, errChan chan errorMessage) {
+	outChan <- "Starting list containers command"
+	host := hconn
+	fmt.Println("1")
+	dc, err := dockerClient.NewClientWithOpts(
+		dockerClient.WithHost(host),
+		dockerClient.WithAPIVersionNegotiation(),
+	)
 
-func dcList(hconn string, ctx context.Context, outChan chan string, errChan chan errorMessage){
-		outChan <- "Starting list containers command"
-		host := hconn
-		fmt.Println("1")
-		dc, err := dockerClient.NewClientWithOpts(
-			dockerClient.WithHost(host),
-			dockerClient.WithAPIVersionNegotiation(),
-		)
-
-		if err != nil {
-			errChan <- errorMessage{
-				err,
-				"Error while creating docker client",
-			}
-			return
+	if err != nil {
+		errChan <- errorMessage{
+			err,
+			"Error while creating docker client",
 		}
-		fmt.Println("2")
+		return
+	}
+	fmt.Println("2")
 
-		defer dc.Close()
-		containers, err := dc.ContainerList(ctx, types.ContainerListOptions{})
-		if err != nil {
+	defer dc.Close()
+	containers, err := dc.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
 		fmt.Println("nope")
-			errChan <- errorMessage{
-				err,
-				"Error while getting containers",
-			}
-			return
+		errChan <- errorMessage{
+			err,
+			"Error while getting containers",
 		}
-		fmt.Println("3")
+		return
+	}
+	fmt.Println("3")
 
-		d, err := json.Marshal(containers)
-		if err != nil {
-			errChan <- errorMessage{
-				err,
-				"failed marshalling",
-			}
-			return
+	d, err := json.Marshal(containers)
+	if err != nil {
+		errChan <- errorMessage{
+			err,
+			"failed marshalling",
 		}
-		fmt.Println("4")
+		return
+	}
+	fmt.Println("4")
 
-		outChan <- string(d)
+	outChan <- string(d)
 }
 
-func dcCreate(hconn string, ctx context.Context, outChan chan string, errChan chan errorMessage){
-		outChan <- "Starting create"
-		host := hconn
+func dcCreate(hconn string, ctx context.Context, outChan chan string, errChan chan errorMessage) {
+	outChan <- "Starting create"
+	host := hconn
 
-		dc, err := dockerClient.NewClientWithOpts(
-			dockerClient.WithHost(host),
-			dockerClient.WithAPIVersionNegotiation(),
-		)
+	dc, err := dockerClient.NewClientWithOpts(
+		dockerClient.WithHost(host),
+		dockerClient.WithAPIVersionNegotiation(),
+	)
 
+	if err != nil {
+		errChan <- errorMessage{
+			err,
+			"error when starting docker container",
+		}
+		return
+	}
+
+	defer dc.Close()
+
+	resp, err := dc.ContainerCreate(ctx, &container.Config{
+		Image: "alpine",
+		Cmd:   []string{"echo", "hello world"},
+		Tty:   false,
+	}, nil, nil, nil, "")
+
+	if err != nil {
+		errChan <- errorMessage{
+			err,
+			"failed to get start docker container",
+		}
+		return
+	}
+	if err := dc.ContainerStart(ctx,
+		resp.ID, types.ContainerStartOptions{}); err != nil {
+		log.Error().Err(err).Msg("Seriously what the fuck?")
+	}
+	stats, errstat := dc.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	select {
+	case err := <-errstat:
 		if err != nil {
 			errChan <- errorMessage{
 				err,
-				"error when starting docker container",
+				"failed to wait for container.",
 			}
 			return
 		}
+	case <-stats:
+	}
 
-		defer dc.Close()
-
-		resp, err := dc.ContainerCreate(ctx, &container.Config{
-			Image: "alpine",
-			Cmd:   []string{"echo", "hello world"},
-			Tty:   false,
-		}, nil, nil, nil, "")
-
-		if err != nil {
-			errChan <- errorMessage{
-				err,
-				"failed to get start docker container",
-			}
-			return
+	out, err := dc.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
+	if err != nil {
+		errChan <- errorMessage{
+			err,
+			"failed to get container logs",
 		}
-		if err := dc.ContainerStart(ctx,
-			resp.ID, types.ContainerStartOptions{}); err != nil {
-			log.Error().Err(err).Msg("Seriously what the fuck?")
-		}
-		stats, errstat := dc.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-		select {
-		case err := <-errstat:
-			if err != nil {
-				errChan <- errorMessage{
-					err,
-					"failed to wait for container.",
-				}
-				return
-			}
-		case <-stats:
-		}
-
-		out, err := dc.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
-		if err != nil {
-			errChan <- errorMessage{
-				err,
-				"failed to get container logs",
-			}
-			return
-		}
-		stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+		return
+	}
+	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 }
 
 func main() {
@@ -164,7 +162,7 @@ func main() {
 			dcList(hconn, ctx, outChan, errChan)
 		},
 	}
-	
+
 	create := &cobra.Command{
 		Use:   "create",
 		Short: "create and start docker containers",
@@ -175,8 +173,9 @@ func main() {
 	}
 
 	rootCmd := &cobra.Command{
-		Use: "h8ctl",
+		Use: "h8",
 	}
+
 	rootCmd.AddCommand(list, create)
 	rootCmd.Execute()
 	close(outChan)
